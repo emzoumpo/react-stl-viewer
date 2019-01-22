@@ -4,6 +4,8 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
 var _Three = require('./Three');
@@ -37,11 +39,13 @@ var Paint = function () {
   _createClass(Paint, [{
     key: 'init',
     value: function init(context) {
+      var _this = this;
+
       this.component = context;
-      this.url = context.props.url;
+      this.urls = context.props.urls;
       this.width = context.props.width;
       this.height = context.props.height;
-      this.modelColor = context.props.modelColor;
+      this.modelColor = context.props.modelColors;
       this.backgroundColor = context.props.backgroundColor;
       this.orbitControls = context.props.orbitControls;
       this.rotate = context.props.rotate;
@@ -53,12 +57,17 @@ var Paint = function () {
       this.lightY = context.props.lightY;
       this.lightZ = context.props.lightZ;
       this.lightColor = context.props.lightColor;
+      this.meshes = [];
+      this.initialBox = new _Three2.default.Box3();
 
-      if (this.mesh !== undefined) {
-        this.scene.remove(this.mesh);
-        this.mesh.geometry.dispose();
-        this.mesh.material.dispose();
+      if (_typeof(this.meshes) === _typeof([])) {
+        this.meshes.forEach(function (mesh) {
+          _this.scene.remove(mesh);
+          mesh.geometry.dispose();
+          mesh.material.dispose();
+        });
       }
+
       var directionalLightObj = this.scene.getObjectByName(DIRECTIONAL_LIGHT);
       if (directionalLightObj) {
         this.scene.remove(directionalLightObj);
@@ -84,44 +93,84 @@ var Paint = function () {
   }, {
     key: 'addSTLToScene',
     value: function addSTLToScene(reqId) {
-      var _this = this;
+      var _this2 = this;
 
       this.loader.crossOrigin = '';
-      this.loader.load(this.url, function (geometry) {
-        if (_this.reqNumber !== reqId) {
-          return;
-        }
-        // Calculate mesh noramls for MeshLambertMaterial.
-        geometry.computeFaceNormals();
-        geometry.computeVertexNormals();
+      var promises = [];
+      this.urls.forEach(function (url, index) {
+        promises.push(_this2.addSTLPromise(url, reqId, index));
+      });
 
-        // Center the object
-        geometry.center();
+      Promise.all(promises).then(function (resolvedArray) {
+        console.log(resolvedArray);
+        resolvedArray.forEach(function (mesh) {
+          // Set the object's dimensions
+          mesh.geometry.computeBoundingBox();
 
-        _this.mesh = new _Three2.default.Mesh(geometry, new _Three2.default.MeshLambertMaterial({
-          overdraw: true,
-          color: _this.modelColor
-        }));
-        // Set the object's dimensions
-        geometry.computeBoundingBox();
-        _this.xDims = geometry.boundingBox.max.x - geometry.boundingBox.min.x;
-        _this.yDims = geometry.boundingBox.max.y - geometry.boundingBox.min.y;
-        _this.zDims = geometry.boundingBox.max.z - geometry.boundingBox.min.z;
+          if (_this2.rotate) {
+            mesh.rotation.x = _this2.rotationSpeeds[0];
+            mesh.rotation.y = _this2.rotationSpeeds[1];
+            mesh.rotation.z = _this2.rotationSpeeds[2];
+          }
 
-        if (_this.rotate) {
-          _this.mesh.rotation.x = _this.rotationSpeeds[0];
-          _this.mesh.rotation.y = _this.rotationSpeeds[1];
-          _this.mesh.rotation.z = _this.rotationSpeeds[2];
-        }
+          _this2.meshes.push(mesh);
+          console.log(_this2.initialBox);
+          console.log(mesh.geometry.boundingBox);
+          _this2.initialBox = _this2.initialBox && _this2.initialBox.union(mesh.geometry.boundingBox) || mesh.geometry.boundingBox;
+        });
 
-        _this.scene.add(_this.mesh);
+        var centerVector = new _Three2.default.Vector3();
+        console.log('final box', _this2.initialBox);
+        console.log(_this2.initialBox.center());
+        _this2.initialBox.center(centerVector);
 
-        _this.addCamera();
-        _this.addInteractionControls();
-        _this.addToReactComponent();
+        _this2.meshes.forEach(function (mesh) {
+          mesh.geometry.translate(-centerVector.x, -centerVector.y, -centerVector.z);
+          _this2.scene.add(mesh);
+        });
+
+        _this2.bedMesh = new _Three2.default.Mesh(new _Three2.default.CubeGeometry(300, 300, 1), new _Three2.default.MeshNormalMaterial());
+
+        _this2.bedMesh.geometry.center();
+        _this2.bedMesh.position.z = _this2.initialBox.min.z - 1.5;
+
+        _this2.scene.add(_this2.bedMesh);
+
+        _this2.xDims = _this2.initialBox.max.x - _this2.initialBox.min.x;
+        _this2.yDims = _this2.initialBox.max.y - _this2.initialBox.min.y;
+        _this2.zDims = _this2.initialBox.max.z - _this2.initialBox.min.z;
+        _this2.addCamera();
+        _this2.addInteractionControls();
+        _this2.addToReactComponent();
 
         // Start the animation
-        _this.animate();
+        _this2.animate();
+      });
+    }
+  }, {
+    key: 'addSTLPromise',
+    value: function addSTLPromise(url, reqId, index) {
+      var _this3 = this;
+
+      return new Promise(function (resolve, reject) {
+        _this3.loader.load(url, function (geometry) {
+          if (_this3.reqNumber !== reqId) {
+            return;
+          }
+          // Calculate mesh noramls for MeshLambertMaterial.
+          geometry.computeFaceNormals();
+          geometry.computeVertexNormals();
+
+          // Center the object
+          // geometry.center();
+
+          var mesh = new _Three2.default.Mesh(geometry, new _Three2.default.MeshLambertMaterial({
+            overdraw: true,
+            color: _this3.modelColor[index % _this3.modelColor.length]
+          }));
+
+          resolve(mesh);
+        });
       });
     }
   }, {
@@ -138,7 +187,7 @@ var Paint = function () {
 
       this.scene.add(this.camera);
 
-      this.camera.lookAt(this.mesh);
+      this.camera.lookAt(this.meshes[0]);
 
       this.renderer.set;
       this.renderer.setSize(this.width, this.height);
@@ -203,12 +252,16 @@ var Paint = function () {
   }, {
     key: 'clean',
     value: function clean() {
-      if (this.mesh !== undefined) {
-        this.mesh.geometry.dispose();
-        this.mesh.material.dispose();
-        this.scene.remove(this.mesh);
-        delete this.mesh;
+      var _this4 = this;
+
+      if (_typeof(this.meshes) === _typeof([])) {
+        this.meshes.forEach(function (mesh) {
+          _this4.scene.remove(mesh);
+          mesh.geometry.dispose();
+          mesh.material.dispose();
+        });
       }
+
       var directionalLightObj = this.scene.getObjectByName(DIRECTIONAL_LIGHT);
       if (directionalLightObj) {
         this.scene.remove(directionalLightObj);
@@ -229,10 +282,14 @@ var Paint = function () {
   }, {
     key: 'render',
     value: function render() {
-      if (this.mesh && this.rotate) {
-        this.mesh.rotation.x += this.rotationSpeeds[0];
-        this.mesh.rotation.y += this.rotationSpeeds[1];
-        this.mesh.rotation.z += this.rotationSpeeds[2];
+      var _this5 = this;
+
+      if (_typeof(this.meshes) === _typeof([]) && this.rotate) {
+        this.meshes.forEach(function (mesh) {
+          mesh.rotation.x += _this5.rotationSpeeds[0];
+          mesh.rotation.y += _this5.rotationSpeeds[1];
+          mesh.rotation.z += _this5.rotationSpeeds[2];
+        });
       }
 
       this.renderer.render(this.scene, this.camera);

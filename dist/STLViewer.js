@@ -36,6 +36,7 @@ var STLViewer = function (_Component) {
   _createClass(STLViewer, [{
     key: 'componentDidMount',
     value: function componentDidMount() {
+      console.log(this);
       this.paint = new _Paint2.default();
       this.paint.init(this);
     }
@@ -62,7 +63,8 @@ var STLViewer = function (_Component) {
       var _props = this.props,
           width = _props.width,
           height = _props.height,
-          modelColor = _props.modelColor;
+          modelColors = _props.modelColors;
+
 
       return _react2.default.createElement(
         'div',
@@ -84,7 +86,7 @@ var STLViewer = function (_Component) {
               alignItems: 'center'
             }
           },
-          _react2.default.createElement(_halogenium.ScaleLoader, { color: modelColor, size: '16px' })
+          _react2.default.createElement(_halogenium.ScaleLoader, { color: modelColors[0], size: '16px' })
         )
       );
     }
@@ -95,11 +97,11 @@ var STLViewer = function (_Component) {
 
 STLViewer.propTypes = {
   className: _propTypes2.default.string,
-  url: _propTypes2.default.string,
+  urls: _propTypes2.default.arrayOf(_propTypes2.default.string),
   width: _propTypes2.default.number,
   height: _propTypes2.default.number,
   backgroundColor: _propTypes2.default.string,
-  modelColor: _propTypes2.default.string,
+  modelColors: _propTypes2.default.arrayOf(_propTypes2.default.string),
   rotate: _propTypes2.default.bool,
   orbitControls: _propTypes2.default.bool,
   cameraX: _propTypes2.default.number,
@@ -113,7 +115,7 @@ STLViewer.propTypes = {
 };
 STLViewer.defaultProps = {
   backgroundColor: '#EAEAEA',
-  modelColor: '#B92C2C',
+  modelColors: ['#FF0000', '#00FF00'],
   height: 400,
   width: 400,
   rotate: true,
