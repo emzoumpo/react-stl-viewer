@@ -27,19 +27,22 @@ var DIRECTIONAL_LIGHT = 'directionalLight';
 var Paint = function () {
   function Paint() {
     _classCallCheck(this, Paint);
-
-    this.loader = new _Three2.default.STLLoader();
-    this.scene = new _Three2.default.Scene();
-    this.renderer = new _Three2.default.WebGLRenderer({
-      antialias: true
-    });
-    this.reqNumber = 0;
   }
 
   _createClass(Paint, [{
     key: 'init',
     value: function init(context) {
-      var _this = this;
+      this.clean();
+
+      this.loader = new _Three2.default.STLLoader();
+      this.scene = new _Three2.default.Scene();
+      this.renderer = new _Three2.default.WebGLRenderer({
+        antialias: true
+      });
+      this.meshes = [];
+      this.bedMesh = null;
+      this.initialBox = new _Three2.default.Box3();
+      this.reqNumber = 0;
 
       this.component = context;
       this.urls = context.props.urls;
@@ -57,35 +60,26 @@ var Paint = function () {
       this.lightY = context.props.lightY;
       this.lightZ = context.props.lightZ;
       this.lightColor = context.props.lightColor;
-      this.meshes = [];
-      this.initialBox = new _Three2.default.Box3();
-
-      if (_typeof(this.meshes) === _typeof([])) {
-        this.meshes.forEach(function (mesh) {
-          _this.scene.remove(mesh);
-          mesh.geometry.dispose();
-          mesh.material.dispose();
-        });
-      }
-
-      var directionalLightObj = this.scene.getObjectByName(DIRECTIONAL_LIGHT);
-      if (directionalLightObj) {
-        this.scene.remove(directionalLightObj);
-      }
-
-      if (this.animationRequestId) {
-        cancelAnimationFrame(this.animationRequestId);
-      }
 
       //Detector.addGetWebGLMessage();
       this.distance = 10000;
+
       var directionalLight = new _Three2.default.DirectionalLight(this.lightColor);
       directionalLight.position.x = this.lightX;
       directionalLight.position.y = this.lightY;
       directionalLight.position.z = this.lightZ;
       directionalLight.position.normalize();
       directionalLight.name = DIRECTIONAL_LIGHT;
+
+      var directionalLight2 = new _Three2.default.DirectionalLight(this.lightColor);
+      directionalLight2.position.x = -this.lightX;
+      directionalLight2.position.y = -this.lightY;
+      directionalLight2.position.z = this.lightZ;
+      directionalLight2.position.normalize();
+      directionalLight2.name = DIRECTIONAL_LIGHT + '2';
+
       this.scene.add(directionalLight);
+      this.scene.add(directionalLight2);
 
       this.reqNumber += 1;
       this.addSTLToScene(this.reqNumber);
@@ -93,68 +87,68 @@ var Paint = function () {
   }, {
     key: 'addSTLToScene',
     value: function addSTLToScene(reqId) {
-      var _this2 = this;
+      var _this = this;
 
       this.loader.crossOrigin = '';
       var promises = [];
       this.urls.forEach(function (url, index) {
-        promises.push(_this2.addSTLPromise(url, reqId, index));
+        promises.push(_this.addSTLPromise(url, reqId, index));
       });
 
       Promise.all(promises).then(function (resolvedArray) {
-        console.log(resolvedArray);
         resolvedArray.forEach(function (mesh) {
           // Set the object's dimensions
           mesh.geometry.computeBoundingBox();
 
-          if (_this2.rotate) {
-            mesh.rotation.x = _this2.rotationSpeeds[0];
-            mesh.rotation.y = _this2.rotationSpeeds[1];
-            mesh.rotation.z = _this2.rotationSpeeds[2];
+          if (_this.rotate) {
+            mesh.rotation.x = _this.rotationSpeeds[0];
+            mesh.rotation.y = _this.rotationSpeeds[1];
+            mesh.rotation.z = _this.rotationSpeeds[2];
           }
 
-          _this2.meshes.push(mesh);
-          console.log(_this2.initialBox);
-          console.log(mesh.geometry.boundingBox);
-          _this2.initialBox = _this2.initialBox && _this2.initialBox.union(mesh.geometry.boundingBox) || mesh.geometry.boundingBox;
+          _this.meshes.push(mesh);
+          _this.initialBox = _this.initialBox && _this.initialBox.union(mesh.geometry.boundingBox) || mesh.geometry.boundingBox;
         });
 
         var centerVector = new _Three2.default.Vector3();
-        console.log('final box', _this2.initialBox);
-        console.log(_this2.initialBox.center());
-        _this2.initialBox.center(centerVector);
+        _this.initialBox.center(centerVector);
 
-        _this2.meshes.forEach(function (mesh) {
+        _this.meshes.forEach(function (mesh) {
           mesh.geometry.translate(-centerVector.x, -centerVector.y, -centerVector.z);
-          _this2.scene.add(mesh);
+          _this.scene.add(mesh);
         });
 
-        _this2.bedMesh = new _Three2.default.Mesh(new _Three2.default.CubeGeometry(300, 300, 1), new _Three2.default.MeshNormalMaterial());
+        _this.bedMesh = new _Three2.default.Mesh(new _Three2.default.CubeGeometry(250, 250, 1), new _Three2.default.MeshBasicMaterial({
+          color: '#999999',
+          transparent: true,
+          opacity: 0.5
+        }));
 
-        _this2.bedMesh.geometry.center();
-        _this2.bedMesh.position.z = _this2.initialBox.min.z - 1.5;
+        _this.xDims = _this.initialBox.max.x - _this.initialBox.min.x;
+        _this.yDims = _this.initialBox.max.y - _this.initialBox.min.y;
+        _this.zDims = _this.initialBox.max.z - _this.initialBox.min.z;
 
-        _this2.scene.add(_this2.bedMesh);
+        _this.bedMesh.geometry.center();
+        _this.bedMesh.geometry.translate(0, 0, -_this.zDims / 2 - 0.5);
 
-        _this2.xDims = _this2.initialBox.max.x - _this2.initialBox.min.x;
-        _this2.yDims = _this2.initialBox.max.y - _this2.initialBox.min.y;
-        _this2.zDims = _this2.initialBox.max.z - _this2.initialBox.min.z;
-        _this2.addCamera();
-        _this2.addInteractionControls();
-        _this2.addToReactComponent();
+        _this.scene.add(_this.bedMesh);
+
+        _this.addCamera();
+        _this.addInteractionControls();
+        _this.addToReactComponent();
 
         // Start the animation
-        _this2.animate();
+        _this.animate();
       });
     }
   }, {
     key: 'addSTLPromise',
     value: function addSTLPromise(url, reqId, index) {
-      var _this3 = this;
+      var _this2 = this;
 
       return new Promise(function (resolve, reject) {
-        _this3.loader.load(url, function (geometry) {
-          if (_this3.reqNumber !== reqId) {
+        _this2.loader.load(url, function (geometry) {
+          if (_this2.reqNumber !== reqId) {
             return;
           }
           // Calculate mesh noramls for MeshLambertMaterial.
@@ -166,7 +160,7 @@ var Paint = function () {
 
           var mesh = new _Three2.default.Mesh(geometry, new _Three2.default.MeshLambertMaterial({
             overdraw: true,
-            color: _this3.modelColor[index % _this3.modelColor.length]
+            color: _this2.modelColor[index % _this2.modelColor.length]
           }));
 
           resolve(mesh);
@@ -199,7 +193,7 @@ var Paint = function () {
       // Add controls for mouse interaction
       if (this.orbitControls) {
         this.controls = new OrbitControls(this.camera, _reactDom2.default.findDOMNode(this.component));
-        this.controls.enableKeys = false;
+        this.controls.enableKeys = true;
         this.controls.addEventListener('change', this.orbitRender.bind(this));
       }
     }
@@ -252,26 +246,47 @@ var Paint = function () {
   }, {
     key: 'clean',
     value: function clean() {
-      var _this4 = this;
+      var _this3 = this;
 
       if (_typeof(this.meshes) === _typeof([])) {
         this.meshes.forEach(function (mesh) {
-          _this4.scene.remove(mesh);
+          if (_this3.scene) {
+            _this3.scene.remove(mesh);
+          }
           mesh.geometry.dispose();
           mesh.material.dispose();
         });
+        this.meshes = [];
       }
 
-      var directionalLightObj = this.scene.getObjectByName(DIRECTIONAL_LIGHT);
-      if (directionalLightObj) {
-        this.scene.remove(directionalLightObj);
+      if (this.bedMesh) {
+        if (this.scene) {
+          this.scene.remove(this.bedMesh);
+        }
+        this.bedMesh.geometry.dispose();
+        this.bedMesh.material.dispose();
+        this.bedMesh = null;
+      }
+
+      if (this.scene) {
+        var directionalLightObj = this.scene.getObjectByName(DIRECTIONAL_LIGHT);
+        if (directionalLightObj) {
+          this.scene.remove(directionalLightObj);
+        }
+        var directionalLightObj2 = this.scene.getObjectByName(DIRECTIONAL_LIGHT + '2');
+        if (directionalLightObj2) {
+          this.scene.remove(directionalLightObj2);
+        }
       }
 
       if (this.animationRequestId) {
         cancelAnimationFrame(this.animationRequestId);
       }
-      this.renderer.dispose();
-      this.renderer.forceContextLoss();
+
+      if (this.renderer) {
+        this.renderer.dispose();
+        this.renderer.forceContextLoss();
+      }
     }
 
     /**
@@ -282,13 +297,13 @@ var Paint = function () {
   }, {
     key: 'render',
     value: function render() {
-      var _this5 = this;
+      var _this4 = this;
 
       if (_typeof(this.meshes) === _typeof([]) && this.rotate) {
         this.meshes.forEach(function (mesh) {
-          mesh.rotation.x += _this5.rotationSpeeds[0];
-          mesh.rotation.y += _this5.rotationSpeeds[1];
-          mesh.rotation.z += _this5.rotationSpeeds[2];
+          mesh.rotation.x += _this4.rotationSpeeds[0];
+          mesh.rotation.y += _this4.rotationSpeeds[1];
+          mesh.rotation.z += _this4.rotationSpeeds[2];
         });
       }
 

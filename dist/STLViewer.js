@@ -36,7 +36,6 @@ var STLViewer = function (_Component) {
   _createClass(STLViewer, [{
     key: 'componentDidMount',
     value: function componentDidMount() {
-      console.log(this);
       this.paint = new _Paint2.default();
       this.paint.init(this);
     }
@@ -124,7 +123,7 @@ STLViewer.defaultProps = {
   cameraY: 0,
   cameraZ: null,
   lightX: 0,
-  lightY: 0,
+  lightY: -1,
   lightZ: 1,
   lightColor: '#ffffff',
   rotationSpeeds: [0, 0, 0.02]

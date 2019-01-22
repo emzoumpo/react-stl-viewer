@@ -5,16 +5,19 @@ let OrbitControls = require('three-orbit-controls')(THREE);
 const DIRECTIONAL_LIGHT = 'directionalLight';
 
 class Paint {
-  constructor() {
+  init(context) {
+    this.clean();
+
     this.loader = new THREE.STLLoader();
     this.scene = new THREE.Scene();
     this.renderer = new THREE.WebGLRenderer({
       antialias: true
     });
+    this.meshes = [];
+    this.bedMesh = null;
+    this.initialBox = new THREE.Box3();
     this.reqNumber = 0;
-  }
 
-  init(context) {
     this.component = context;
     this.urls = context.props.urls;
     this.width = context.props.width;
@@ -31,35 +34,26 @@ class Paint {
     this.lightY = context.props.lightY;
     this.lightZ = context.props.lightZ;
     this.lightColor = context.props.lightColor;
-    this.meshes = [];
-    this.initialBox = new THREE.Box3();
-
-    if (typeof this.meshes === typeof []) {
-      this.meshes.forEach(mesh => {
-        this.scene.remove(mesh);
-        mesh.geometry.dispose();
-        mesh.material.dispose();
-      });
-    }
-
-    const directionalLightObj = this.scene.getObjectByName(DIRECTIONAL_LIGHT);
-    if (directionalLightObj) {
-      this.scene.remove(directionalLightObj);
-    }
-
-    if (this.animationRequestId) {
-      cancelAnimationFrame(this.animationRequestId);
-    }
 
     //Detector.addGetWebGLMessage();
     this.distance = 10000;
+
     let directionalLight = new THREE.DirectionalLight(this.lightColor);
     directionalLight.position.x = this.lightX;
     directionalLight.position.y = this.lightY;
     directionalLight.position.z = this.lightZ;
     directionalLight.position.normalize();
     directionalLight.name = DIRECTIONAL_LIGHT;
+
+    let directionalLight2 = new THREE.DirectionalLight(this.lightColor);
+    directionalLight2.position.x = -this.lightX;
+    directionalLight2.position.y = -this.lightY;
+    directionalLight2.position.z = this.lightZ;
+    directionalLight2.position.normalize();
+    directionalLight2.name = DIRECTIONAL_LIGHT + '2';
+
     this.scene.add(directionalLight);
+    this.scene.add(directionalLight2);
 
     this.reqNumber += 1;
     this.addSTLToScene(this.reqNumber);
@@ -73,7 +67,6 @@ class Paint {
     });
 
     Promise.all(promises).then(resolvedArray => {
-      console.log(resolvedArray);
       resolvedArray.forEach(mesh => {
         // Set the object's dimensions
         mesh.geometry.computeBoundingBox();
@@ -85,8 +78,6 @@ class Paint {
         }
 
         this.meshes.push(mesh);
-        console.log(this.initialBox);
-        console.log(mesh.geometry.boundingBox);
         this.initialBox =
           (this.initialBox &&
             this.initialBox.union(mesh.geometry.boundingBox)) ||
@@ -94,8 +85,6 @@ class Paint {
       });
 
       let centerVector = new THREE.Vector3();
-      console.log('final box', this.initialBox);
-      console.log(this.initialBox.center());
       this.initialBox.center(centerVector);
 
       this.meshes.forEach(mesh => {
@@ -108,18 +97,23 @@ class Paint {
       });
 
       this.bedMesh = new THREE.Mesh(
-        new THREE.CubeGeometry(300, 300, 1),
-        new THREE.MeshNormalMaterial()
+        new THREE.CubeGeometry(250, 250, 1),
+        new THREE.MeshBasicMaterial({
+          color: '#999999',
+          transparent: true,
+          opacity: 0.5
+        })
       );
-
-      this.bedMesh.geometry.center();
-      this.bedMesh.position.z = this.initialBox.min.z - 1.5;
-
-      this.scene.add(this.bedMesh);
 
       this.xDims = this.initialBox.max.x - this.initialBox.min.x;
       this.yDims = this.initialBox.max.y - this.initialBox.min.y;
       this.zDims = this.initialBox.max.z - this.initialBox.min.z;
+
+      this.bedMesh.geometry.center();
+      this.bedMesh.geometry.translate(0, 0, -this.zDims / 2 - 0.5);
+
+      this.scene.add(this.bedMesh);
+
       this.addCamera();
       this.addInteractionControls();
       this.addToReactComponent();
@@ -186,7 +180,7 @@ class Paint {
         this.camera,
         ReactDOM.findDOMNode(this.component)
       );
-      this.controls.enableKeys = false;
+      this.controls.enableKeys = true;
       this.controls.addEventListener('change', this.orbitRender.bind(this));
     }
   }
@@ -234,22 +228,45 @@ class Paint {
   clean() {
     if (typeof this.meshes === typeof []) {
       this.meshes.forEach(mesh => {
-        this.scene.remove(mesh);
+        if (this.scene) {
+          this.scene.remove(mesh);
+        }
         mesh.geometry.dispose();
         mesh.material.dispose();
       });
+      this.meshes = [];
     }
 
-    const directionalLightObj = this.scene.getObjectByName(DIRECTIONAL_LIGHT);
-    if (directionalLightObj) {
-      this.scene.remove(directionalLightObj);
+    if (this.bedMesh) {
+      if (this.scene) {
+        this.scene.remove(this.bedMesh);
+      }
+      this.bedMesh.geometry.dispose();
+      this.bedMesh.material.dispose();
+      this.bedMesh = null;
+    }
+
+    if (this.scene) {
+      const directionalLightObj = this.scene.getObjectByName(DIRECTIONAL_LIGHT);
+      if (directionalLightObj) {
+        this.scene.remove(directionalLightObj);
+      }
+      const directionalLightObj2 = this.scene.getObjectByName(
+        DIRECTIONAL_LIGHT + '2'
+      );
+      if (directionalLightObj2) {
+        this.scene.remove(directionalLightObj2);
+      }
     }
 
     if (this.animationRequestId) {
       cancelAnimationFrame(this.animationRequestId);
     }
-    this.renderer.dispose();
-    this.renderer.forceContextLoss();
+
+    if (this.renderer) {
+      this.renderer.dispose();
+      this.renderer.forceContextLoss();
+    }
   }
 
   /**
