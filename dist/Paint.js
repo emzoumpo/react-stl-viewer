@@ -31,6 +31,7 @@ var Paint = function () {
     this.renderer = new _Three2.default.WebGLRenderer({
       antialias: true
     });
+    this.reqNumber = 0;
   }
 
   _createClass(Paint, [{
@@ -54,10 +55,9 @@ var Paint = function () {
       this.lightColor = context.props.lightColor;
 
       if (this.mesh !== undefined) {
+        this.scene.remove(this.mesh);
         this.mesh.geometry.dispose();
         this.mesh.material.dispose();
-        this.scene.remove(this.mesh);
-        delete this.mesh;
       }
       var directionalLightObj = this.scene.getObjectByName(DIRECTIONAL_LIGHT);
       if (directionalLightObj) {
@@ -78,15 +78,19 @@ var Paint = function () {
       directionalLight.name = DIRECTIONAL_LIGHT;
       this.scene.add(directionalLight);
 
-      this.addSTLToScene();
+      this.reqNumber += 1;
+      this.addSTLToScene(this.reqNumber);
     }
   }, {
     key: 'addSTLToScene',
-    value: function addSTLToScene() {
+    value: function addSTLToScene(reqId) {
       var _this = this;
 
       this.loader.crossOrigin = '';
       this.loader.load(this.url, function (geometry) {
+        if (_this.reqNumber !== reqId) {
+          return;
+        }
         // Calculate mesh noramls for MeshLambertMaterial.
         geometry.computeFaceNormals();
         geometry.computeVertexNormals();

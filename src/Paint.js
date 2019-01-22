@@ -16,10 +16,10 @@ class Paint {
 
   init(context) {
     this.component = context;
-    this.url = context.props.url;
+    this.urls = context.props.urls;
     this.width = context.props.width;
     this.height = context.props.height;
-    this.modelColor = context.props.modelColor;
+    this.modelColor = context.props.modelColors;
     this.backgroundColor = context.props.backgroundColor;
     this.orbitControls = context.props.orbitControls;
     this.rotate = context.props.rotate;
@@ -31,12 +31,17 @@ class Paint {
     this.lightY = context.props.lightY;
     this.lightZ = context.props.lightZ;
     this.lightColor = context.props.lightColor;
+    this.meshes = [];
+    this.initialBox = new THREE.Box3();
 
-    if (this.mesh !== undefined) {
-      this.scene.remove(this.mesh);
-      this.mesh.geometry.dispose();
-      this.mesh.material.dispose();
+    if (typeof this.meshes === typeof []) {
+      this.meshes.forEach(mesh => {
+        this.scene.remove(mesh);
+        mesh.geometry.dispose();
+        mesh.material.dispose();
+      });
     }
+
     const directionalLightObj = this.scene.getObjectByName(DIRECTIONAL_LIGHT);
     if (directionalLightObj) {
       this.scene.remove(directionalLightObj);
@@ -62,44 +67,91 @@ class Paint {
 
   addSTLToScene(reqId) {
     this.loader.crossOrigin = '';
-    this.loader.load(this.url, geometry => {
-      if (this.reqNumber !== reqId) {
-        return;
-      }
-      // Calculate mesh noramls for MeshLambertMaterial.
-      geometry.computeFaceNormals();
-      geometry.computeVertexNormals();
+    let promises = [];
+    this.urls.forEach((url, index) => {
+      promises.push(this.addSTLPromise(url, reqId, index));
+    });
 
-      // Center the object
-      geometry.center();
+    Promise.all(promises).then(resolvedArray => {
+      console.log(resolvedArray);
+      resolvedArray.forEach(mesh => {
+        // Set the object's dimensions
+        mesh.geometry.computeBoundingBox();
 
-      this.mesh = new THREE.Mesh(
-        geometry,
-        new THREE.MeshLambertMaterial({
-          overdraw: true,
-          color: this.modelColor
-        })
+        if (this.rotate) {
+          mesh.rotation.x = this.rotationSpeeds[0];
+          mesh.rotation.y = this.rotationSpeeds[1];
+          mesh.rotation.z = this.rotationSpeeds[2];
+        }
+
+        this.meshes.push(mesh);
+        console.log(this.initialBox);
+        console.log(mesh.geometry.boundingBox);
+        this.initialBox =
+          (this.initialBox &&
+            this.initialBox.union(mesh.geometry.boundingBox)) ||
+          mesh.geometry.boundingBox;
+      });
+
+      let centerVector = new THREE.Vector3();
+      console.log('final box', this.initialBox);
+      console.log(this.initialBox.center());
+      this.initialBox.center(centerVector);
+
+      this.meshes.forEach(mesh => {
+        mesh.geometry.translate(
+          -centerVector.x,
+          -centerVector.y,
+          -centerVector.z
+        );
+        this.scene.add(mesh);
+      });
+
+      this.bedMesh = new THREE.Mesh(
+        new THREE.CubeGeometry(300, 300, 1),
+        new THREE.MeshNormalMaterial()
       );
-      // Set the object's dimensions
-      geometry.computeBoundingBox();
-      this.xDims = geometry.boundingBox.max.x - geometry.boundingBox.min.x;
-      this.yDims = geometry.boundingBox.max.y - geometry.boundingBox.min.y;
-      this.zDims = geometry.boundingBox.max.z - geometry.boundingBox.min.z;
 
-      if (this.rotate) {
-        this.mesh.rotation.x = this.rotationSpeeds[0];
-        this.mesh.rotation.y = this.rotationSpeeds[1];
-        this.mesh.rotation.z = this.rotationSpeeds[2];
-      }
+      this.bedMesh.geometry.center();
+      this.bedMesh.position.z = this.initialBox.min.z - 1.5;
 
-      this.scene.add(this.mesh);
+      this.scene.add(this.bedMesh);
 
+      this.xDims = this.initialBox.max.x - this.initialBox.min.x;
+      this.yDims = this.initialBox.max.y - this.initialBox.min.y;
+      this.zDims = this.initialBox.max.z - this.initialBox.min.z;
       this.addCamera();
       this.addInteractionControls();
       this.addToReactComponent();
 
       // Start the animation
       this.animate();
+    });
+  }
+
+  addSTLPromise(url, reqId, index) {
+    return new Promise((resolve, reject) => {
+      this.loader.load(url, geometry => {
+        if (this.reqNumber !== reqId) {
+          return;
+        }
+        // Calculate mesh noramls for MeshLambertMaterial.
+        geometry.computeFaceNormals();
+        geometry.computeVertexNormals();
+
+        // Center the object
+        // geometry.center();
+
+        const mesh = new THREE.Mesh(
+          geometry,
+          new THREE.MeshLambertMaterial({
+            overdraw: true,
+            color: this.modelColor[index % this.modelColor.length]
+          })
+        );
+
+        resolve(mesh);
+      });
     });
   }
 
@@ -120,7 +172,7 @@ class Paint {
 
     this.scene.add(this.camera);
 
-    this.camera.lookAt(this.mesh);
+    this.camera.lookAt(this.meshes[0]);
 
     this.renderer.set;
     this.renderer.setSize(this.width, this.height);
@@ -180,12 +232,14 @@ class Paint {
    * @returns {void}
    */
   clean() {
-    if (this.mesh !== undefined) {
-      this.mesh.geometry.dispose();
-      this.mesh.material.dispose();
-      this.scene.remove(this.mesh);
-      delete this.mesh;
+    if (typeof this.meshes === typeof []) {
+      this.meshes.forEach(mesh => {
+        this.scene.remove(mesh);
+        mesh.geometry.dispose();
+        mesh.material.dispose();
+      });
     }
+
     const directionalLightObj = this.scene.getObjectByName(DIRECTIONAL_LIGHT);
     if (directionalLightObj) {
       this.scene.remove(directionalLightObj);
@@ -203,10 +257,12 @@ class Paint {
    * @returns {void}
    */
   render() {
-    if (this.mesh && this.rotate) {
-      this.mesh.rotation.x += this.rotationSpeeds[0];
-      this.mesh.rotation.y += this.rotationSpeeds[1];
-      this.mesh.rotation.z += this.rotationSpeeds[2];
+    if (typeof this.meshes === typeof [] && this.rotate) {
+      this.meshes.forEach(mesh => {
+        mesh.rotation.x += this.rotationSpeeds[0];
+        mesh.rotation.y += this.rotationSpeeds[1];
+        mesh.rotation.z += this.rotationSpeeds[2];
+      });
     }
 
     this.renderer.render(this.scene, this.camera);

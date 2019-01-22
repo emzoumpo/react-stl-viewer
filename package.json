@@ -1,22 +1,23 @@
 {
-  "name": "stl-viewer",
+  "name": "multiple-stl-viewer",
   "version": "0.10.0",
-  "description": "A component for viewing an STL object from a given URL by utilizing Three.js",
+  "description": "A component for viewing one or more STL objects (on the same scene) from given URLs by utilizing Three.js",
   "main": "dist/STLViewer.js",
   "keywords": [
     "JavaScript",
     "STL",
     "STL viewer",
+    "Multiple STL viewer",
     "Three",
     "Three.js",
     "React",
     "3D"
   ],
-  "author": "Chiedo",
+  "author": "emzoumpo",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/chiedolabs/react-stl-viewer.git"
+    "url": "https://github.com/emzoumpo/react-multiple-stl-viewer.git"
   },
   "scripts": {
     "build": "./node_modules/babel-cli/bin/babel.js -d dist src/ && NODE_ENV=production webpack -p --config webpack.config.prod.js",

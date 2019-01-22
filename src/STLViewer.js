@@ -6,11 +6,11 @@ import Paint from './Paint';
 class STLViewer extends Component {
   static propTypes = {
     className: PropTypes.string,
-    url: PropTypes.string,
+    urls: PropTypes.arrayOf(PropTypes.string),
     width: PropTypes.number,
     height: PropTypes.number,
     backgroundColor: PropTypes.string,
-    modelColor: PropTypes.string,
+    modelColors: PropTypes.arrayOf(PropTypes.string),
     rotate: PropTypes.bool,
     orbitControls: PropTypes.bool,
     cameraX: PropTypes.number,
@@ -25,7 +25,7 @@ class STLViewer extends Component {
 
   static defaultProps = {
     backgroundColor: '#EAEAEA',
-    modelColor: '#B92C2C',
+    modelColors: ['#FF0000', '#00FF00'],
     height: 400,
     width: 400,
     rotate: true,
@@ -41,6 +41,7 @@ class STLViewer extends Component {
   };
 
   componentDidMount() {
+    console.log(this);
     this.paint = new Paint();
     this.paint.init(this);
   }
@@ -60,7 +61,8 @@ class STLViewer extends Component {
   }
 
   render() {
-    const { width, height, modelColor } = this.props;
+    const { width, height, modelColors } = this.props;
+
     return (
       <div
         className={this.props.className}
@@ -78,7 +80,7 @@ class STLViewer extends Component {
             alignItems: 'center'
           }}
         >
-          <ScaleLoader color={modelColor} size="16px" />
+          <ScaleLoader color={modelColors[0]} size="16px" />
         </div>
       </div>
     );
