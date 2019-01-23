@@ -39,6 +39,7 @@ var Paint = function () {
       this.renderer = new _Three2.default.WebGLRenderer({
         antialias: true
       });
+
       this.meshes = [];
       this.bedMesh = null;
       this.initialBox = new _Three2.default.Box3();
@@ -132,6 +133,12 @@ var Paint = function () {
         _this.bedMesh.geometry.translate(0, 0, -_this.zDims / 2 - 0.5);
 
         _this.scene.add(_this.bedMesh);
+
+        _this.axisHelper = new _Three2.default.AxisHelper(_this.bedMesh.geometry.boundingBox.max.x - _this.bedMesh.geometry.boundingBox.min.x);
+
+        _this.axisHelper.position.set(_this.bedMesh.geometry.boundingBox.min.x, _this.bedMesh.geometry.boundingBox.min.y, _this.bedMesh.geometry.boundingBox.max.z);
+
+        _this.scene.add(_this.axisHelper);
 
         _this.addCamera();
         _this.addInteractionControls();
@@ -266,6 +273,13 @@ var Paint = function () {
         this.bedMesh.geometry.dispose();
         this.bedMesh.material.dispose();
         this.bedMesh = null;
+      }
+
+      if (this.axisHelper) {
+        if (this.scene) {
+          this.scene.remove(this.axisHelper);
+        }
+        this.axisHelper = null;
       }
 
       if (this.scene) {

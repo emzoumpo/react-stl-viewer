@@ -13,6 +13,7 @@ class Paint {
     this.renderer = new THREE.WebGLRenderer({
       antialias: true
     });
+
     this.meshes = [];
     this.bedMesh = null;
     this.initialBox = new THREE.Box3();
@@ -113,6 +114,19 @@ class Paint {
       this.bedMesh.geometry.translate(0, 0, -this.zDims / 2 - 0.5);
 
       this.scene.add(this.bedMesh);
+
+      this.axisHelper = new THREE.AxisHelper(
+        this.bedMesh.geometry.boundingBox.max.x -
+          this.bedMesh.geometry.boundingBox.min.x
+      );
+
+      this.axisHelper.position.set(
+        this.bedMesh.geometry.boundingBox.min.x,
+        this.bedMesh.geometry.boundingBox.min.y,
+        this.bedMesh.geometry.boundingBox.max.z
+      );
+
+      this.scene.add(this.axisHelper);
 
       this.addCamera();
       this.addInteractionControls();
@@ -244,6 +258,13 @@ class Paint {
       this.bedMesh.geometry.dispose();
       this.bedMesh.material.dispose();
       this.bedMesh = null;
+    }
+
+    if (this.axisHelper) {
+      if (this.scene) {
+        this.scene.remove(this.axisHelper);
+      }
+      this.axisHelper = null;
     }
 
     if (this.scene) {
